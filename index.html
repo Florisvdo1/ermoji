@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<!-- Lock viewport, no zoom -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Emoji Planner - Two Vertical Columns in Deck</title>
+<style>
+  html, body {
+    margin:0; padding:0; width:100%; height:100%;
+    background:linear-gradient(120deg, #eef7ff, #99ccff);
+    font-family:sans-serif; overflow:hidden; /* no scrolling on main body */
+    user-select:none; -webkit-user-select:none;
+    touch-action:manipulation; /* better handling for mobile drags */
+  }
+
+  /* Overall container => header at top, then main. */
+  .app {
+    display:flex; flex-direction:column;
+    width:100%; height:100%;
+  }
+
+  header {
+    background:#66a3e0; color:#fff;
+    padding:8px 16px; box-sizing:border-box;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0;
+    box-shadow:0 2px rgba(0,0,0,0.15);
+  }
+  header h1 {
+    margin:0; font-size:1.2rem;
+  }
+  header button {
+    background:#fff; color:#66a3e0; border:none; border-radius:20px;
+    padding:0.4rem 1rem; font-size:0.9rem; cursor:pointer;
+    box-shadow:0 1px rgba(0,0,0,0.2);
+  }
+
+  /* Main => day sectors on left, emoji deck on the right. No scroll needed. */
+  .main {
+    flex:1; display:flex; overflow:hidden;
+  }
+
+  /* Day Sectors => left side, no scroll. */
+  .sectors {
+    width:clamp(150px, 40vw, 300px); /* ensures a proportion for left side */
+    background:rgba(255,255,255,0.2);
+    display:flex; flex-direction:column; align-items:center; 
+    justify-content:center;
+    padding:8px; box-sizing:border-box;
+  }
+  .sector {
+    background:rgba(255,255,255,0.3);
+    margin:6px; padding:6px; border-radius:8px;
+    width:95%; max-width:280px; box-sizing:border-box;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+  }
+  .sector h2 {
+    margin:0 0 6px; font-size:1rem; color:#003366; text-align:center;
+  }
+  .placeholder-grid {
+    display:grid;
+    grid-template-columns:repeat(2,1fr); 
+    grid-template-rows:repeat(2,1fr);
+    gap:6px;
+    justify-items:center; align-items:center;
+  }
+  .placeholder {
+    background:#eef; 
+    border:1px solid #ccc; 
+    border-radius:4px;
+    width:50px; height:50px;
+    display:flex; align-items:center; justify-content:center;
+    color:#003366; font-size:1rem;
+  }
+  .placeholder.has-emoji { background:#dde; }
+
+  /* Emoji Deck => right side => two vertical columns for all emojis => no scroll. */
+  .deck-area {
+    flex:1; 
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    background:rgba(255,255,255,0.3);
+    box-sizing:border-box; 
+    padding:8px;
+  }
+
+  .deck-header {
+    display:flex; align-items:center; gap:6px;
+    margin-bottom:8px;
+  }
+  .deck-header .arrow-btn {
+    background:#fff; color:#66a3e0; border:none; border-radius:50%;
+    width:28px; height:28px; font-size:1.1rem;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; box-shadow:0 1px rgba(0,0,0,0.2);
+  }
+  .deck-header .deck-title {
+    color:#003366; margin:0; font-size:1rem; font-weight:bold;
+  }
+  .deck-header .search-btn {
+    background:#fff; color:#66a3e0;
+    border:none; border-radius:20px;
+    padding:0.3rem 0.8rem; cursor:pointer;
+    box-shadow:0 1px rgba(0,0,0,0.2);
+    font-size:0.8rem;
+  }
+
+  /* The two vertical columns => each column has 8 emojis => no horizontal or vertical scroll. 
+     We'll place them side-by-side or stacked, depending on your preference.
+     The instruction says "2 vertical columns next to each other," 
+     so we use a grid with 2 columns × 8 rows. 
+  */
+  .emoji-grid {
+    display:grid; 
+    grid-template-columns:repeat(2,1fr); /* 2 columns */
+    grid-template-rows:repeat(8,1fr);    /* 8 rows */
+    gap:6px;
+    /* ensures it fits in the right area with no scroll */
+    width:clamp(140px, 50vw, 300px);
+    height:clamp(280px, 70vh, 500px); /* 2 columns × 8 rows => final size */
+  }
+  .emoji-item {
+    background:#fff; 
+    border:1px solid #ccc; 
+    border-radius:4px;
+    width:100%; height:100%; /* fill the grid cell */
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.2rem; color:#003366;
+    cursor:grab; box-shadow:inset 0 0 2px rgba(0,0,0,0.1);
+  }
+
+  /* Drag => pinned under finger => top z-index. */
+  .emoji-item.dragging {
+    position:fixed;
+    z-index:9999;
+    pointer-events:none;
+    opacity:0.8;
+    transform:scale(1.1);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Emoji Planner</h1>
+    <button id="resetBtn">Reset</button>
+  </header>
+
+  <div class="main">
+    <!-- Left: Day Sectors -->
+    <div class="sectors">
+      <div class="sector">
+        <h2>Morning</h2>
+        <div class="placeholder-grid">
+          <div class="placeholder"></div><div class="placeholder"></div>
+          <div class="placeholder"></div><div class="placeholder"></div>
+        </div>
+      </div>
+      <div class="sector">
+        <h2>Midday</h2>
+        <div class="placeholder-grid">
+          <div class="placeholder"></div><div class="placeholder"></div>
+          <div class="placeholder"></div><div class="placeholder"></div>
+        </div>
+      </div>
+      <div class="sector">
+        <h2>Evening</h2>
+        <div class="placeholder-grid">
+          <div class="placeholder"></div><div class="placeholder"></div>
+          <div class="placeholder"></div><div class="placeholder"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Deck area => arrow up/down, "Emoji Deck" text, search, then 2 column × 8 row grid. -->
+    <div class="deck-area">
+      <div class="deck-header">
+        <button class="arrow-btn" id="arrowUp">↑</button>
+        <button class="arrow-btn" id="arrowDown">↓</button>
+        <h3 class="deck-title">Emoji Deck</h3>
+        <button class="search-btn" id="searchBtn">Search</button>
+      </div>
+
+      <div class="emoji-grid" id="emojiGrid">
+        <!-- 16 emojis => 2 columns × 8 rows. Feel free to add/replace with your own. -->
+        <div class="emoji-item">☀️</div>
+        <div class="emoji-item">🍎</div>
+        <div class="emoji-item">🏆</div>
+        <div class="emoji-item">🍕</div>
+        <div class="emoji-item">🎉</div>
+        <div class="emoji-item">💻</div>
+        <div class="emoji-item">🍔</div>
+        <div class="emoji-item">🏃‍♀️</div>
+        <div class="emoji-item">☕</div>
+        <div class="emoji-item">🎮</div>
+        <div class="emoji-item">🧘‍♂️</div>
+        <div class="emoji-item">🚴‍♂️</div>
+        <div class="emoji-item">🍿</div>
+        <div class="emoji-item">🎨</div>
+        <div class="emoji-item">🌮</div>
+        <div class="emoji-item">🍰</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let dragItem=null;
+
+/* Basic pinned-under-finger drag & drop */
+function onTouchStart(e){
+  e.preventDefault();
+  dragItem = e.currentTarget;
+  dragItem.classList.add('dragging');
+  const touch=e.touches[0];
+  positionDragElement(touch.clientX,touch.clientY);
+
+  document.addEventListener('touchmove', onTouchMove, {passive:false});
+  document.addEventListener('touchend', onTouchEnd);
+}
+function onTouchMove(e){
+  e.preventDefault();
+  const touch=e.touches[0];
+  positionDragElement(touch.clientX,touch.clientY);
+}
+function onTouchEnd(e){
+  document.removeEventListener('touchmove', onTouchMove);
+  document.removeEventListener('touchend', onTouchEnd);
+
+  if(dragItem){
+    dragItem.classList.remove('dragging');
+    dragItem.style.position='';
+    dragItem.style.left='';
+    dragItem.style.top='';
+
+    const touch=e.changedTouches[0];
+    const dropTarget=document.elementFromPoint(touch.clientX,touch.clientY);
+    const placeholder=dropTarget? dropTarget.closest('.placeholder'):null;
+
+    /* If placeholder is empty => place emoji */
+    if(placeholder && !placeholder.classList.contains('has-emoji')){
+      placeholder.textContent=dragItem.textContent;
+      placeholder.classList.add('has-emoji');
+    }
+    dragItem=null;
+  }
+}
+function positionDragElement(x,y){
+  if(dragItem){
+    const w=dragItem.offsetWidth;
+    const h=dragItem.offsetHeight;
+    dragItem.style.position='fixed';
+    dragItem.style.left=(x - w/2)+'px';
+    dragItem.style.top=(y - h/2)+'px';
+  }
+}
+
+/* Attach events to all .emoji-item */
+document.querySelectorAll('.emoji-item').forEach(emoji=>{
+  emoji.addEventListener('touchstart', onTouchStart, {passive:false});
+});
+
+/* Simple arrow up/down => placeholders */
+document.getElementById('arrowUp').addEventListener('click',()=>{
+  alert("Arrow up clicked - define your logic here!");
+});
+document.getElementById('arrowDown').addEventListener('click',()=>{
+  alert("Arrow down clicked - define your logic here!");
+});
+
+/* Search button => demonstration alert */
+document.getElementById('searchBtn').addEventListener('click',()=>{
+  alert("Search not implemented yet!");
+});
+
+/* Reset => remove any placed emojis */
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  document.querySelectorAll('.placeholder').forEach(ph=>{
+    ph.textContent='';
+    ph.classList.remove('has-emoji');
+  });
+  alert("All placeholders cleared!");
+});
+</script>
+</body>
+</html>
